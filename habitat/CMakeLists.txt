@@ -1,0 +1,94 @@
+set(SIMULATOR_SRCS
+    types.hpp
+    sim.hpp sim.inl sim.cpp
+)
+SET(GPU_HIDESEEK_COMPILE_FLAGS
+    -v)
+
+add_library(mad_escape_cpu_impl STATIC
+    ${SIMULATOR_SRCS}
+)
+
+target_link_libraries(mad_escape_cpu_impl
+    PUBLIC
+        madrona_mw_core
+    PRIVATE
+        madrona_common
+        madrona_mw_physics
+        madrona_rendering_system
+)
+
+add_library(mad_escape_importer STATIC
+    import.cpp
+)
+
+target_link_libraries(mad_escape_importer
+    PRIVATE
+        madrona_libcxx
+    PUBLIC
+        simdjson::simdjson
+)
+
+add_library(mad_escape_mgr STATIC
+    mgr.hpp mgr.cpp
+)
+
+target_link_libraries(mad_escape_mgr 
+    PUBLIC
+        madrona_python_utils
+        mad_escape_importer
+    PRIVATE
+        mad_escape_cpu_impl
+        madrona_mw_cpu
+        madrona_common
+        madrona_importer
+        madrona_physics_loader
+        madrona_render
+        # madrona_ktx
+        madrona_render_asset_processor
+)
+
+if (TARGET madrona_mw_gpu)
+    madrona_build_compile_defns(
+        OUT_TARGET
+            mad_escape_gpu_srcs
+        SOURCES_DEFN
+            GPU_HIDESEEK_SRC_LIST
+        FLAGS_DEFN
+            GPU_HIDESEEK_COMPILE_FLAGS 
+        SRCS
+            ${SIMULATOR_SRCS}
+    )
+
+    target_link_libraries(mad_escape_mgr PRIVATE
+        mad_escape_gpu_srcs
+        madrona_mw_gpu
+    )
+endif ()
+
+target_compile_definitions(mad_escape_mgr PRIVATE
+    -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
+)
+
+if (TARGET madrona_viz)
+    add_executable(viewer viewer.cpp)
+    target_link_libraries(viewer 
+        PUBLIC
+        mad_escape_importer mad_escape_mgr
+        PRIVATE
+        madrona_mw_core madrona_viz madrona_cuda stb)
+
+    target_compile_definitions(viewer PUBLIC
+        -DMADRONA_VIEWER
+    )
+
+    if (TARGET madrona_cuda)
+        target_link_libraries(viewer PRIVATE madrona_cuda)
+    endif()
+    target_compile_definitions(viewer PRIVATE
+        -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
+    )
+endif()
+
+add_executable(headless headless.cpp)
+target_link_libraries(headless PUBLIC madrona_mw_core mad_escape_mgr madrona_viz madrona_cuda stb)
