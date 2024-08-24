@@ -170,6 +170,8 @@ struct Manager::CUDAImpl final : Manager::Impl {
         if (renderGraph.has_value()) {
             gpuExec.run(*renderGraph);
         }
+
+        exit(0);
     }
 
     virtual inline Tensor exportTensor(ExportID slot,
