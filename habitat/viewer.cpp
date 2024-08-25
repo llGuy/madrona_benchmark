@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
     }
 
     ExecMode exec_mode = ExecMode::CPU;
+
     if (argc >= 3) {
         if (!strcmp("--cpu", argv[2])) {
             exec_mode = ExecMode::CPU;
@@ -99,9 +100,10 @@ int main(int argc, char *argv[])
 
     printf("premanage: \n");
 
-    auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
+    // auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
+    // uint32_t raycast_output_resolution = std::stoi(resolution_str);
 
-    uint32_t raycast_output_resolution = std::stoi(resolution_str);
+    uint32_t raycast_output_resolution = 128;
 
     // Create the simulation manager
     Manager mgr({

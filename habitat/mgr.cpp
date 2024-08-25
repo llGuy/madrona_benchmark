@@ -28,6 +28,8 @@
 #include <madrona/cuda_utils.hpp>
 #endif
 
+#include <madrona_ktx.h>
+
 #define MADRONA_VIEWER
 
 using namespace madrona;
@@ -183,6 +185,21 @@ struct Manager::CUDAImpl final : Manager::Impl {
 #else
 static_assert(false, "This only works with the CUDA backend");
 #endif
+
+static Optional<imp::SourceTexture> ktxImageImportFn(
+        void *data, size_t num_bytes)
+{
+    ktx::ConvertedOutput converted = {};
+    ktx::loadKTXMem(data, num_bytes, &converted);
+
+    return imp::SourceTexture {
+        .data = converted.textureData,
+        .format = imp::SourceTextureFormat::BC7,
+        .width = (uint32_t)converted.width,
+        .height = (uint32_t)converted.height,
+        .numBytes = converted.bufferSize
+    };
+}
 
 struct LoadResult {
     std::vector<ImportedInstance> importedInstances;
@@ -389,6 +406,10 @@ static imp::ImportedAssets loadScenes(
 
     imp::AssetImporter importer;
 
+    // Setup importer to handle KTX images
+    imp::ImageImporter &img_importer = importer.imageImporter();
+    img_importer.addHandler("ktx2", ktxImageImportFn);
+
     std::array<char, 1024> import_err;
     auto render_assets = importer.importFromDisk(
         render_asset_cstrs, Span<char>(import_err.data(), import_err.size()),
@@ -402,18 +423,12 @@ static imp::ImportedAssets loadScenes(
         FATAL("Failed to load render assets: %s", import_err);
     }
 
-
-    uint32_t habitat_material = 7;
-    char *texture_cache = getenv("MADRONA_TEXTURE_CACHE_DIR");
-
-
     if (render_mgr.has_value()) {
         printf("Rasterizer is loading assets\n");
 
         render_mgr->loadObjects(render_assets->objects, 
-                render_assets->materials, 
-                // render_assets->texture);
-                {});
+                render_assets->materials, {});
+                // render_assets->textures);
 
         render_mgr->configureLighting({
             { true, math::Vector3{1.0f, -1.0f, -0.05f}, math::Vector3{1.0f, 1.0f, 1.0f} }
@@ -456,15 +471,22 @@ Manager::Impl * Manager::Impl::init(
         const char *first_unique_scene_str = getenv("HSSD_FIRST_SCENE");
         const char *num_unique_scene_str = getenv("HSSD_NUM_SCENES");
 
-        assert(first_unique_scene_str && num_unique_scene_str);
+        uint32_t first_scene = 0;
+        uint32_t num_scenes = 1;
 
-        printf("%d %d\n", std::stoi(first_unique_scene_str), std::stoi(num_unique_scene_str));
+        if (first_unique_scene_str) {
+            first_scene = std::stoi(first_unique_scene_str);
+        }
+
+        if (num_unique_scene_str) {
+            num_scenes = std::stoi(num_unique_scene_str);
+        }
 
         LoadResult load_result = {};
 
         auto imported_assets = loadScenes(
-                render_mgr, std::stoi(first_unique_scene_str),
-                std::stoi(num_unique_scene_str),
+                render_mgr, first_scene,
+                num_scenes,
                 load_result);
 
         sim_cfg.importedInstances = (ImportedInstance *)cu::allocGPU(
@@ -524,8 +546,8 @@ Manager::Impl * Manager::Impl::init(
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
             .numExportedBuffers = (uint32_t)ExportID::NumExports, 
         }, {
-            { GPU_HIDESEEK_SRC_LIST },
-            { GPU_HIDESEEK_COMPILE_FLAGS },
+            { HABITAT_SRC_LIST },
+            { HABITAT_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
         }, cu_ctx, 
         mgr_cfg.enableBatchRenderer ? Optional<madrona::CudaBatchRenderConfig>::none() : 
@@ -535,7 +557,7 @@ Manager::Impl * Manager::Impl::init(
                 .geoBVHData = render::AssetProcessor::makeBVHData(imported_assets.objects),
                 .materialData = render::AssetProcessor::initMaterialData(
                         imported_assets.materials.data(), imported_assets.materials.size(),
-                        nullptr, 0),
+                        imported_assets.textures.data(), imported_assets.textures.size()),
                 .renderResolution = raycast_output_resolution,
                 .nearPlane = 3.f,
                 .farPlane = 1000.f

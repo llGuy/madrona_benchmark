@@ -1,15 +1,15 @@
-set(SIMULATOR_SRCS
+set(HABITAT_SIMULATOR_SRCS
     types.hpp
     sim.hpp sim.inl sim.cpp
 )
-SET(GPU_HIDESEEK_COMPILE_FLAGS
+SET(HABITAT_COMPILE_FLAGS
     -v)
 
-add_library(mad_escape_cpu_impl STATIC
-    ${SIMULATOR_SRCS}
+add_library(habitat_cpu_impl STATIC
+    ${HABITAT_SIMULATOR_SRCS}
 )
 
-target_link_libraries(mad_escape_cpu_impl
+target_link_libraries(habitat_cpu_impl
     PUBLIC
         madrona_mw_core
     PRIVATE
@@ -18,77 +18,80 @@ target_link_libraries(mad_escape_cpu_impl
         madrona_rendering_system
 )
 
-add_library(mad_escape_importer STATIC
+add_library(habitat_importer STATIC
     import.cpp
 )
 
-target_link_libraries(mad_escape_importer
+target_link_libraries(habitat_importer
     PRIVATE
         madrona_libcxx
     PUBLIC
         simdjson::simdjson
 )
 
-add_library(mad_escape_mgr STATIC
+add_library(habitat_mgr STATIC
     mgr.hpp mgr.cpp
 )
 
-target_link_libraries(mad_escape_mgr 
+target_link_libraries(habitat_mgr 
     PUBLIC
         madrona_python_utils
-        mad_escape_importer
+        habitat_importer
     PRIVATE
-        mad_escape_cpu_impl
+        habitat_cpu_impl
         madrona_mw_cpu
         madrona_common
         madrona_importer
         madrona_physics_loader
         madrona_render
-        # madrona_ktx
+        madrona_ktx
         madrona_render_asset_processor
 )
 
 if (TARGET madrona_mw_gpu)
     madrona_build_compile_defns(
         OUT_TARGET
-            mad_escape_gpu_srcs
+            habitat_gpu_srcs
         SOURCES_DEFN
-            GPU_HIDESEEK_SRC_LIST
+            HABITAT_SRC_LIST
         FLAGS_DEFN
-            GPU_HIDESEEK_COMPILE_FLAGS 
+            HABITAT_COMPILE_FLAGS 
         SRCS
-            ${SIMULATOR_SRCS}
+            ${HABITAT_SIMULATOR_SRCS}
     )
 
-    target_link_libraries(mad_escape_mgr PRIVATE
-        mad_escape_gpu_srcs
+    target_link_libraries(habitat_mgr PRIVATE
+        habitat_gpu_srcs
         madrona_mw_gpu
     )
 endif ()
 
-target_compile_definitions(mad_escape_mgr PRIVATE
+target_compile_definitions(habitat_mgr PRIVATE
     -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
 )
 
 if (TARGET madrona_viz)
-    add_executable(viewer viewer.cpp)
-    target_link_libraries(viewer 
+    add_executable(habitat_viewer viewer.cpp)
+    target_link_libraries(habitat_viewer 
         PUBLIC
-        mad_escape_importer mad_escape_mgr
+        habitat_importer habitat_mgr
         PRIVATE
         madrona_mw_core madrona_viz madrona_cuda stb)
 
-    target_compile_definitions(viewer PUBLIC
+    target_compile_definitions(habitat_viewer PUBLIC
         -DMADRONA_VIEWER
     )
 
+    # target_compile_options(habitat_viewer PRIVATE -fsanitize=address)
+    # target_link_options(habitat_viewer PRIVATE -fsanitize=address)
+
     if (TARGET madrona_cuda)
-        target_link_libraries(viewer PRIVATE madrona_cuda)
+        target_link_libraries(habitat_viewer PRIVATE madrona_cuda)
     endif()
-    target_compile_definitions(viewer PRIVATE
+    target_compile_definitions(habitat_viewer PRIVATE
         -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
     )
 endif()
 
 add_executable(headless headless.cpp)
-target_link_libraries(headless PUBLIC madrona_mw_core mad_escape_mgr madrona_viz madrona_cuda stb)
+target_link_libraries(headless PUBLIC madrona_mw_core habitat_mgr madrona_viz madrona_cuda stb)
