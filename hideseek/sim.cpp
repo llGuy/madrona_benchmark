@@ -84,7 +84,7 @@ void Sim::registerTypes(ECSRegistry &registry,
     registry.exportSingleton<GlobalDebugPositions>(
         ExportID::GlobalDebugPositions);
     registry.exportColumn<render::RaycastOutputArchetype,
-        render::RenderOutputBuffer>(
+        render::RGBOutputBuffer>(
             (uint32_t)ExportID::Raycast);
 }
 

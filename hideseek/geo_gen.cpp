@@ -7,6 +7,18 @@ using namespace madrona::phys;
 namespace GPUHideSeek {
 
 template <typename T>
+T max(T a, T b)
+{
+    return a > b ? a : b;
+}
+
+template <typename T>
+T min(T a, T b)
+{
+    return a < b ? a : b;
+}
+
+template <typename T>
 struct TmpArray {
 public:
     void alloc(Context &ctx, CountT maxSize) {
@@ -194,19 +206,19 @@ int findAnotherWall(
                 chosen.length() >= 0.3f && otherWall.length() >= 0.3f) {
 
                 // Make sure there aren't any walls between these
-                float high = std::min(chosen.p2.x, otherWall.p2.x);
-                float low = std::max(chosen.p1.x, otherWall.p1.x);
+                float high = min(chosen.p2.x, otherWall.p2.x);
+                float low = max(chosen.p1.x, otherWall.p1.x);
 
                 bool works = true;
                 for (int j = 0; j < list.size(); ++j) {
                     if (j != currentIndirectIdx) {
                         // Check that this wall isn't in between
-                        float inbetweenLow = std::max(walls.walls[list[j]].p1.x, low - 0.1f);
-                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.x, high + 0.1f);
+                        float inbetweenLow = max(walls.walls[list[j]].p1.x, low - 0.1f);
+                        float inbetweenHigh = min(walls.walls[list[j]].p2.x, high + 0.1f);
                         if (inbetweenLow < inbetweenHigh) {
                             float y = walls.walls[list[j]].p1.y;
-                            float yMin = std::min(chosen.p1.y, otherWall.p1.y);
-                            float yMax = std::max(chosen.p1.y, otherWall.p1.y);
+                            float yMin = min(chosen.p1.y, otherWall.p1.y);
+                            float yMax = max(chosen.p1.y, otherWall.p1.y);
                             if (y > yMin && y < yMax) {
                                 works = false;
                                 // printf("Wall in between!\n");
@@ -237,19 +249,19 @@ int findAnotherWall(
             if (!(chosen.p1.y >= otherWall.p2.y || chosen.p2.y <= otherWall.p1.y) &&
                 chosen.length() >= 0.5f && otherWall.length() >= 0.5f) {
                 // Make sure there aren't any walls between these
-                float high = std::min(chosen.p2.y, otherWall.p2.y);
-                float low = std::max(chosen.p1.y, otherWall.p1.y);
+                float high = min(chosen.p2.y, otherWall.p2.y);
+                float low = max(chosen.p1.y, otherWall.p1.y);
 
                 bool works = true;
                 for (int j = 0; j < list.size(); ++j) {
                     if (j != currentIndirectIdx) {
                         // Check that this wall isn't in between
-                        float inbetweenLow = std::max(walls.walls[list[j]].p1.y, low - 0.1f);
-                        float inbetweenHigh = std::min(walls.walls[list[j]].p2.y, high + 0.1f);
+                        float inbetweenLow = max(walls.walls[list[j]].p1.y, low - 0.1f);
+                        float inbetweenHigh = min(walls.walls[list[j]].p2.y, high + 0.1f);
                         if (inbetweenLow < inbetweenHigh) {
                             float x = walls.walls[list[j]].p1.x;
-                            float xMin = std::min(chosen.p1.x, otherWall.p1.x);
-                            float xMax = std::max(chosen.p1.x, otherWall.p1.x);
+                            float xMin = min(chosen.p1.x, otherWall.p1.x);
+                            float xMax = max(chosen.p1.x, otherWall.p1.x);
                             if (x > xMin && x < xMax) {
                                 works = false;
                                 // printf("Wall in between!\n");
@@ -337,8 +349,8 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
 
             if (isHorizontal) {
                 // Get range
-                float high = std::min(first->p2.x, second->p2.x);
-                float low = std::max(first->p1.x, second->p1.x);
+                float high = min(first->p2.x, second->p2.x);
+                float low = max(first->p1.x, second->p1.x);
 
                 // Make sure that first has a lower y coordinate
                 if (first->p1.y > second->p1.y) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
@@ -373,8 +385,8 @@ void applyWallOperation(WallOperation op, Walls &walls, RNG &rng) {
             }
             else {
                 // Get range
-                float high = std::min(first->p2.y, second->p2.y);
-                float low = std::max(first->p1.y, second->p1.y);
+                float high = min(first->p2.y, second->p2.y);
+                float low = max(first->p1.y, second->p1.y);
 
                 if (first->p1.x > second->p1.x) { std::swap(first, second); std::swap(wallIndirectIdx, otherWallIndirectIdx); }
 

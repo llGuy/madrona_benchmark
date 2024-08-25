@@ -175,8 +175,9 @@ int main(int argc, char *argv[])
         render_mode[0] == '1';
 #endif
 
-    auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
-    uint32_t raycast_output_resolution = std::stoi(resolution_str);
+    // auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
+    // uint32_t raycast_output_resolution = std::stoi(resolution_str);
+    uint32_t raycast_output_resolution = 128;
 
     WindowManager wm {};
     WindowHandle window = wm.makeWindow("Hide & Seek", 2730/2, 1536/2);

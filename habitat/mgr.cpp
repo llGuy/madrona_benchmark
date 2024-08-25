@@ -258,6 +258,8 @@ static imp::ImportedAssets loadScenes(
     if (seed_str) {
         printf("Using seed!\n");
         rng.seed(std::stoi(seed_str));
+    } else {
+        rng.seed(0);
     }
 
     std::shuffle(random_indices.begin(), random_indices.end(), rng);
@@ -427,8 +429,8 @@ static imp::ImportedAssets loadScenes(
         printf("Rasterizer is loading assets\n");
 
         render_mgr->loadObjects(render_assets->objects, 
-                render_assets->materials, {});
-                // render_assets->textures);
+                render_assets->materials,
+                render_assets->textures);
 
         render_mgr->configureLighting({
             { true, math::Vector3{1.0f, -1.0f, -0.05f}, math::Vector3{1.0f, 1.0f, 1.0f} }

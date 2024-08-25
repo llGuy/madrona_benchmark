@@ -80,6 +80,7 @@ static inline Optional<render::RenderManager> initRenderManager(
 
     return render::RenderManager(render_api, render_dev, {
         .enableBatchRenderer = mgr_cfg.enableBatchRenderer,
+        .renderMode = render::RenderManager::Config::RenderMode::RGBD,
         .agentViewWidth = mgr_cfg.batchRenderViewWidth,
         .agentViewHeight = mgr_cfg.batchRenderViewHeight,
         .numWorlds = mgr_cfg.numWorlds,
@@ -174,8 +175,10 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
         .type = CollisionPrimitive::Type::Plane,
     };
 
+    imp::AssetImporter importer;
+
     char import_err_buffer[4096];
-    auto imported_hulls = imp::ImportedAssets::importFromDisk({
+    auto imported_hulls = importer.importFromDisk({
         (std::filesystem::path(DATA_DIR) / "cube_collision.obj").string().c_str(),
         (std::filesystem::path(DATA_DIR) / "wall_collision.obj").string().c_str(),
         (std::filesystem::path(DATA_DIR) / "agent_collision.obj").string().c_str(),
@@ -295,10 +298,18 @@ static void loadPhysicsObjects(PhysicsLoader &loader)
     free(rigid_body_data);
 }
 
+imp::SourceTexture makeSourceTexture(const char *path,
+                                     imp::ImageImporter &importer)
+{
+    auto img = importer.importImage(path);
+    assert(img.has_value());
+    return *img;
+}
+
 static imp::ImportedAssets loadRenderObjects(
         Optional<render::RenderManager> &render_mgr,
         std::vector<imp::SourceMaterial> materials,
-        std::vector<imp::SourceTexture> texture_paths)
+        std::vector<const char *> texture_paths)
 {
     std::array<std::string, (size_t)SimObject::NumObjects> render_asset_paths;
     render_asset_paths[(size_t)SimObject::Sphere] =
@@ -321,44 +332,47 @@ static imp::ImportedAssets loadRenderObjects(
         render_asset_cstrs[i] = render_asset_paths[i].c_str();
     }
 
+    imp::AssetImporter importer;
+    auto &img_importer = importer.imageImporter();
+
     std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk(
+    auto render_assets = importer.importFromDisk(
         render_asset_cstrs, Span<char>(import_err.data(), import_err.size()),
-        true, true);
+        true);
 
     if (!render_assets.has_value()) {
         FATAL("Failed to load render assets: %s", import_err);
     }
 
+    for (auto &mat : materials) {
+        render_assets->materials.push_back(mat);
+    }
+
+    std::vector<imp::SourceTexture> textures = {
+        makeSourceTexture(texture_paths[0], img_importer),
+        makeSourceTexture(texture_paths[1], img_importer),
+        makeSourceTexture(texture_paths[2], img_importer)
+    };
+
+    for (auto &tx : textures) {
+        render_assets->textures.push_back(tx);
+    }
+
     // Override materials
     render_assets->objects[0].meshes[0].materialIDX = 0;
-    render_assets->geoData.meshBVHArrays[0][0].materialIDX = 0;
-
     render_assets->objects[1].meshes[0].materialIDX = 3;
-    render_assets->geoData.meshBVHArrays[1][0].materialIDX = 3;
-
     render_assets->objects[2].meshes[0].materialIDX = 1;
-    render_assets->geoData.meshBVHArrays[2][0].materialIDX = 1;
-
     render_assets->objects[3].meshes[0].materialIDX = 0;
-    render_assets->geoData.meshBVHArrays[3][0].materialIDX = 0;
-
     render_assets->objects[4].meshes[0].materialIDX = 2;
-    render_assets->geoData.meshBVHArrays[4][0].materialIDX = 2;
-
     render_assets->objects[4].meshes[1].materialIDX = 6;
     render_assets->objects[4].meshes[2].materialIDX = 6;
-
     render_assets->objects[5].meshes[0].materialIDX = 4;
-    render_assets->geoData.meshBVHArrays[5][0].materialIDX = 4;
-
     render_assets->objects[6].meshes[0].materialIDX = 5;
-    render_assets->geoData.meshBVHArrays[6][0].materialIDX = 5;
 
     if (render_mgr.has_value()) {
         render_mgr->loadObjects(render_assets->objects,
                 Span(materials.data(), materials.size()), 
-                Span(texture_paths.data(), (CountT)texture_paths.size()),
+                Span(textures.data(), (CountT)textures.size()),
                 true);
 
         render_mgr->configureLighting({
@@ -371,21 +385,6 @@ static imp::ImportedAssets loadRenderObjects(
 
 Manager::Impl * Manager::Impl::make(const Config &cfg)
 {
-    std::array<char, 1024> import_err;
-    auto render_assets = imp::ImportedAssets::importFromDisk({
-        (std::filesystem::path(DATA_DIR) / "sphere.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "plane.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cube_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "wall_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "cylinder_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "ramp_render.obj").string().c_str(),
-        (std::filesystem::path(DATA_DIR) / "elongated_render.obj").string().c_str(),
-    }, Span<char>(import_err.data(), import_err.size()));
-
-    if (!render_assets.has_value()) {
-        FATAL("Failed to load render assets: %s", import_err);
-    }
-
     GPUHideSeek::Config app_cfg;
     app_cfg.simFlags = cfg.simFlags;
     app_cfg.initRandKey = rand::initKey(cfg.randSeed);
@@ -413,8 +412,6 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
         Optional<render::RenderManager> render_mgr =
             initRenderManager(cfg, render_gpu_state);
 
-        imp::ImportedAssets::GPUGeometryData gpu_imported_assets;
-
         std::vector<imp::SourceMaterial> materials = {
             { math::Vector4{0.4f, 0.4f, 0.4f, 0.0f}, -1, 0.8f, 0.2f,},
             { math::Vector4{1.0f, 0.1f, 0.1f, 0.0f}, -1, 0.8f, 0.2f,},
@@ -430,21 +427,14 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
         auto smile_str = (std::filesystem::path(DATA_DIR) /
                "smile.png").string();
 
-        std::vector<imp::SourceTexture> textures =  {
-            { green_grid_str.c_str() },
-            { smile_str.c_str() },
-            { smile_str.c_str() }
+        std::vector<const char *> textures =  {
+            green_grid_str.c_str(),
+            smile_str.c_str(),
+            smile_str.c_str()
         };
 
         auto imported_assets = loadRenderObjects(
                 render_mgr, materials, textures);
-
-        auto gpu_imported_assets_opt =
-            imp::ImportedAssets::makeGPUData(imported_assets);
-
-        assert(gpu_imported_assets_opt.has_value());
-
-        gpu_imported_assets = std::move(*gpu_imported_assets_opt);
 
         if (render_mgr.has_value()) {
             app_cfg.renderBridge = render_mgr->bridge();
@@ -453,6 +443,11 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
         }
 
         HeapArray<WorldInit> world_inits(cfg.numWorlds);
+
+        CudaBatchRenderConfig::RenderMode rt_render_mode;
+        if (!cfg.enableBatchRenderer) {
+            rt_render_mode = CudaBatchRenderConfig::RenderMode::RGBD;
+        }
 
         MWCudaExecutor mwgpu_exec({
             .worldInitPtr = world_inits.data(),
@@ -464,16 +459,22 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
             .numWorlds = cfg.numWorlds,
             .numTaskGraphs = (uint32_t)TaskGraphID::NumTaskGraphs,
             .numExportedBuffers = (uint32_t)ExportID::NumExports,
-            .geometryData = &gpu_imported_assets,
-            .materials = { materials.data(), (CountT)materials.size() },
-            .textures = { textures.data(), (CountT)textures.size() },
-            .raycastOutputResolution = cfg.raycastOutputResolution,
-            .nearSphere = 2.1f
         }, {
             { GPU_HIDESEEK_SRC_LIST },
             { GPU_HIDESEEK_COMPILE_FLAGS },
             CompileConfig::OptMode::LTO,
-        }, cu_ctx);
+        }, cu_ctx,
+        cfg.enableBatchRenderer ? Optional<madrona::CudaBatchRenderConfig>::none() :
+            madrona::CudaBatchRenderConfig {
+                .renderMode = rt_render_mode,
+                .geoBVHData = render::AssetProcessor::makeBVHData(imported_assets.objects),
+                .materialData = render::AssetProcessor::initMaterialData(
+                        imported_assets.materials.data(), imported_assets.materials.size(),
+                        imported_assets.textures.data(), imported_assets.textures.size()),
+                .renderResolution = cfg.raycastOutputResolution,
+                .nearPlane = 3.f,
+                .farPlane = 1000.f
+            });
 
         MWCudaLaunchGraph step_graph = mwgpu_exec.buildLaunchGraph(
             TaskGraphID::Step);
@@ -481,11 +482,11 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
         MWCudaLaunchGraph render_graph = mwgpu_exec.buildLaunchGraph(
             TaskGraphID::Render);
 
-        Optional<MWCudaLaunchGraph> rt_graph = [&]() {
-            if (!cfg.enableBatchRenderer) {
-                mwgpu_exec.buildRenderGraph();
-            } else {
+        Optional<MWCudaLaunchGraph> rt_graph = [&]() -> Optional<MWCudaLaunchGraph> {
+            if (cfg.enableBatchRenderer) {
                 return Optional<MWCudaLaunchGraph>::none();
+            } else {
+                return mwgpu_exec.buildRenderGraph();
             }
         } ();
 
