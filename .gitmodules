@@ -2,6 +2,6 @@
 	path = external/madrona
 	url = https://github.com/shacklettbp/madrona.git
 	branch = raytrace_rgbd
-[submodule "external/madrona-kts"]
-	path = external/madrona-kts
+[submodule "external/madrona-ktx"]
+	path = external/madrona-ktx
 	url = https://github.com/shacklettbp/madrona-ktx.git
