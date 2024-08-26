@@ -59,7 +59,7 @@ target_compile_definitions(gpu_hideseek_mgr PRIVATE
 if (TARGET madrona_viz)
     add_executable(hideseek_viewer viewer.cpp)
     target_link_libraries(hideseek_viewer PRIVATE
-        madrona_mw_core gpu_hideseek_mgr madrona_viz)
+        madrona_mw_core gpu_hideseek_mgr madrona_viz run_common)
 
     target_compile_definitions(hideseek_viewer PRIVATE
         -DDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../data/"
@@ -75,4 +75,5 @@ if (TARGET madrona_viz)
 endif()
 
 add_executable(hideseek_headless headless.cpp)
-target_link_libraries(hideseek_headless madrona_mw_core gpu_hideseek_mgr stb madrona_cuda)
+target_link_libraries(hideseek_headless 
+    madrona_mw_core gpu_hideseek_mgr stb madrona_cuda run_common)

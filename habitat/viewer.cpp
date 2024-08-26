@@ -2,6 +2,7 @@
 #include <madrona/render/render_mgr.hpp>
 #include <madrona/window.hpp>
 
+#include "args.hpp"
 #include "sim.hpp"
 #include "mgr.hpp"
 #include "types.hpp"
@@ -29,91 +30,39 @@ void transposeImage(char *output,
     }
 }
 
-static HeapArray<int32_t> readReplayLog(const char *path)
-{
-    std::ifstream replay_log(path, std::ios::binary);
-    replay_log.seekg(0, std::ios::end);
-    int64_t size = replay_log.tellg();
-    replay_log.seekg(0, std::ios::beg);
-
-    HeapArray<int32_t> log(size / sizeof(int32_t));
-
-    replay_log.read((char *)log.data(), (size / sizeof(int32_t)) * sizeof(int32_t));
-
-    return log;
-}
-
 int main(int argc, char *argv[])
 {
     using namespace madEscape;
 
-    constexpr int64_t num_views = 2;
+    run::ViewerRunArgs args = run::parseViewerArgs(argc, argv);
 
-    // Read command line arguments
-    uint32_t num_worlds = 1;
-    if (argc >= 2) {
-        num_worlds = (uint32_t)atoi(argv[1]);
-    }
-
-    ExecMode exec_mode = ExecMode::CPU;
-
-    if (argc >= 3) {
-        if (!strcmp("--cpu", argv[2])) {
-            exec_mode = ExecMode::CPU;
-        } else if (!strcmp("--cuda", argv[2])) {
-            exec_mode = ExecMode::CUDA;
-        }
-    }
-
-    // Setup replay log
-    const char *replay_log_path = nullptr;
-    if (argc >= 4) {
-        replay_log_path = argv[3];
-    }
-
-    auto replay_log = Optional<HeapArray<int32_t>>::none();
-    uint32_t cur_replay_step = 0;
-    uint32_t num_replay_steps = 0;
-    if (replay_log_path != nullptr) {
-        replay_log = readReplayLog(replay_log_path);
-        num_replay_steps = replay_log->size() / (num_worlds * num_views * 4);
-    }
-
-    // Render mode 0 is no rendering
-    // Render mode 1 is rasterization.
-    // Render mode 2 is raycasting.
     auto *render_mode = getenv("MADRONA_RENDER_MODE");
 
-    bool enable_batch_renderer =
-#ifdef MADRONA_MACOS
-        false;
-#else
-        render_mode[0] == '1';
-#endif
+    // "Batch renderer" refers to the rasterizer.
+    bool enable_batch_renderer = (args.renderMode == run::RenderMode::Rasterizer);
 
     WindowManager wm {};
-    WindowHandle window = wm.makeWindow("Escape Room", 1080, 720);
+    WindowHandle window = wm.makeWindow("Habitat Viewer", 
+            args.windowWidth, args.windowHeight);
+
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
-
-    // auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
-    // uint32_t raycast_output_resolution = std::stoi(resolution_str);
-
-    uint32_t raycast_output_resolution = 128;
+    uint32_t output_resolution = args.batchRenderWidth;
+    uint32_t num_worlds = args.numWorlds;
 
     // Create the simulation manager
     Manager mgr({
-        .execMode = exec_mode,
+        .execMode = madrona::ExecMode::CUDA,
         .gpuID = 0,
         .numWorlds = num_worlds,
         .randSeed = 5,
-        .autoReset = replay_log.has_value(),
+        .autoReset = false,
         .enableBatchRenderer = enable_batch_renderer,
-        .batchRenderViewWidth = raycast_output_resolution,
-        .batchRenderViewHeight = raycast_output_resolution,
+        .batchRenderViewWidth = output_resolution,
+        .batchRenderViewHeight = output_resolution,
         .extRenderAPI = wm.gpuAPIManager().backend(),
         .extRenderDev = render_gpu.device(),
-        .raycastOutputResolution = raycast_output_resolution,
+        .raycastOutputResolution = output_resolution,
     });
     float camera_move_speed = 10.f;
 
@@ -132,34 +81,6 @@ int main(int argc, char *argv[])
         .cameraPosition = initial_camera_position,
         .cameraRotation = initial_camera_rotation,
     });
-
-    // Replay step
-    auto replayStep = [&]() {
-        if (cur_replay_step == num_replay_steps - 1) {
-            return true;
-        }
-
-        for (uint32_t i = 0; i < num_worlds; i++) {
-            for (uint32_t j = 0; j < num_views; j++) {
-                uint32_t base_idx = 0;
-                base_idx = 4 * (cur_replay_step * num_views * num_worlds +
-                    i * num_views + j);
-
-                int32_t move_amount = (*replay_log)[base_idx];
-                int32_t move_angle = (*replay_log)[base_idx + 1];
-                int32_t turn = (*replay_log)[base_idx + 2];
-                int32_t g = (*replay_log)[base_idx + 3];
-
-                mgr.setAction(i, j, move_amount, move_angle, turn, g,
-                        1, 1, 1, 1, 1);
-            }
-        }
-
-        cur_replay_step++;
-
-        return false;
-    };
-
 
     // Main loop for the viewer viewer
     viewer.loop(
@@ -277,14 +198,6 @@ int main(int argc, char *argv[])
         mgr.setAction(world_idx, agent_idx, move_amount, move_angle, 
                 r, g, x, y, z, rot, vrot);
     }, [&]() {
-        if (replay_log.has_value()) {
-            bool replay_finished = replayStep();
-
-            if (replay_finished) {
-                viewer.stopLoop();
-            }
-        }
-
         mgr.step();
     }, [&]() {
         {
@@ -295,7 +208,7 @@ int main(int argc, char *argv[])
 
             unsigned char* print_ptr;
 #ifdef MADRONA_CUDA_SUPPORT
-            int64_t num_bytes = 4 * raycast_output_resolution * raycast_output_resolution * num_images_total;
+            int64_t num_bytes = 4 * output_resolution * output_resolution * num_images_total;
             print_ptr = (unsigned char*)cu::allocReadback(num_bytes);
 #else
             print_ptr = nullptr;
@@ -303,7 +216,7 @@ int main(int argc, char *argv[])
 
             char *raycast_tensor = (char *)(mgr.raycastTensor().devicePtr());
 
-            uint32_t bytes_per_image = 4 * raycast_output_resolution * raycast_output_resolution;
+            uint32_t bytes_per_image = 4 * output_resolution * output_resolution;
 
             uint32_t image_idx = viewer.getCurrentWorldID() * 1 + 
                 std::max(viewer.getCurrentViewID(), (CountT)0);
@@ -312,14 +225,12 @@ int main(int argc, char *argv[])
 
             raycast_tensor += image_idx * bytes_per_image;
 
-            if(exec_mode == ExecMode::CUDA){
 #ifdef MADRONA_CUDA_SUPPORT
-                cudaMemcpy(print_ptr, raycast_tensor,
-                        num_bytes,
-                        cudaMemcpyDeviceToHost);
-                raycast_tensor = (char *)print_ptr;
+            cudaMemcpy(print_ptr, raycast_tensor,
+                    num_bytes,
+                    cudaMemcpyDeviceToHost);
+            raycast_tensor = (char *)print_ptr;
 #endif
-            }
 
             ImGui::Begin("Raycast");
 
@@ -330,17 +241,17 @@ int main(int argc, char *argv[])
             int vertOff = 70;
 
             float pixScale = 3;
-            int extentsX = (int)(pixScale * raycast_output_resolution);
-            int extentsY = (int)(pixScale * raycast_output_resolution);
+            int extentsX = (int)(pixScale * output_resolution);
+            int extentsY = (int)(pixScale * output_resolution);
 
             for (int image_y = 0; image_y < num_image_y; ++image_y) {
                 for (int image_x = 0; image_x < num_image_x; ++image_x) {
-                    for (int i = 0; i < raycast_output_resolution; i++) {
-                        for (int j = 0; j < raycast_output_resolution; j++) {
+                    for (int i = 0; i < output_resolution; i++) {
+                        for (int j = 0; j < output_resolution; j++) {
                             uint32_t linear_image_idx = image_y + image_x * num_image_x;
 
                             uint32_t linear_idx = 4 * 
-                                (j + (i + linear_image_idx * raycast_output_resolution) * raycast_output_resolution);
+                                (j + (i + linear_image_idx * output_resolution) * output_resolution);
 
                             auto realColor = IM_COL32(
                                     (uint8_t)raycasters[linear_idx + 0],
@@ -349,10 +260,10 @@ int main(int argc, char *argv[])
                                     255);
 
                             draw2->AddRectFilled(
-                                    { ((i + image_y * raycast_output_resolution) * pixScale) + windowPos.x, 
-                                    ((j + image_x * raycast_output_resolution) * pixScale) + windowPos.y + vertOff }, 
-                                    { ((i + 1 + image_y * raycast_output_resolution) * pixScale) + windowPos.x,   
-                                    ((j + image_x * raycast_output_resolution + 1) * pixScale) + +windowPos.y + vertOff },
+                                    { ((i + image_y * output_resolution) * pixScale) + windowPos.x, 
+                                    ((j + image_x * output_resolution) * pixScale) + windowPos.y + vertOff }, 
+                                    { ((i + 1 + image_y * output_resolution) * pixScale) + windowPos.x,   
+                                    ((j + image_x * output_resolution + 1) * pixScale) + +windowPos.y + vertOff },
                                     realColor, 0, 0);
                         }
                     }

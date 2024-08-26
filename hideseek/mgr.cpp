@@ -472,7 +472,7 @@ Manager::Impl * Manager::Impl::make(const Config &cfg)
                         imported_assets.materials.data(), imported_assets.materials.size(),
                         imported_assets.textures.data(), imported_assets.textures.size()),
                 .renderResolution = cfg.raycastOutputResolution,
-                .nearPlane = 3.f,
+                .nearPlane = 0.1f,
                 .farPlane = 1000.f
             });
 

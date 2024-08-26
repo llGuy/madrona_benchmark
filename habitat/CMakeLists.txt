@@ -76,7 +76,7 @@ if (TARGET madrona_viz)
         PUBLIC
         habitat_importer habitat_mgr
         PRIVATE
-        madrona_mw_core madrona_viz madrona_cuda stb)
+        madrona_mw_core madrona_viz madrona_cuda stb run_common)
 
     target_compile_definitions(habitat_viewer PUBLIC
         -DMADRONA_VIEWER
@@ -90,5 +90,8 @@ if (TARGET madrona_viz)
     )
 endif()
 
-add_executable(headless headless.cpp)
-target_link_libraries(headless PUBLIC madrona_mw_core habitat_mgr madrona_viz madrona_cuda stb)
+add_executable(habitat_headless headless.cpp)
+target_link_libraries(habitat_headless 
+    PUBLIC 
+        madrona_mw_core habitat_mgr madrona_viz madrona_cuda stb run_common
+)

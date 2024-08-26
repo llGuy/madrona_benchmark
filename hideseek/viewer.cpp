@@ -10,6 +10,8 @@
 
 #include <stb_image_write.h>
 
+#include "args.hpp"
+
 using namespace madrona;
 using namespace madrona::viz;
 
@@ -45,139 +47,21 @@ int main(int argc, char *argv[])
 {
     using namespace GPUHideSeek;
 
-    uint32_t num_worlds = 1;
-    ExecMode exec_mode = ExecMode::CPU;
+    run::ViewerRunArgs args = run::parseViewerArgs(argc, argv);
 
-    auto usageErr = [argv]() {
-        fprintf(stderr, "%s [NUM_WORLDS] [--backend cpu|cuda] [--record path] [--replay path] [--load-ckpt path] [--print-obs]\n", argv[0]);
-        exit(EXIT_FAILURE);
-    };
-
-    bool num_worlds_set = false;
-
-    char *record_log_path = nullptr;
-    char *replay_log_path = nullptr;
-    char *load_ckpt_path = nullptr;
-    bool start_frozen = false;
-    bool print_obs = false;
-
-    for (int i = 1; i < argc; i++) {
-        char *arg = argv[i];
-
-        if (arg[0] == '-' && arg[1] == '-') {
-            arg += 2;
-
-            if (!strcmp("backend", arg)) {
-                i += 1;
-
-                if (i == argc) {
-                    usageErr();
-                }
-
-                char *value = argv[i];
-                if (!strcmp("cpu", value)) {
-                    exec_mode = ExecMode::CPU;
-                } else if (!strcmp("cuda", value)) {
-                    exec_mode = ExecMode::CUDA;
-                } else {
-                    usageErr();
-                }
-            } else if (!strcmp("record", arg)) {
-                if (record_log_path != nullptr) {
-                    usageErr();
-                }
-
-                i += 1;
-
-                if (i == argc) {
-                    usageErr();
-                }
-
-                record_log_path = argv[i];
-            } else if (!strcmp("replay", arg)) {
-                if (replay_log_path != nullptr) {
-                    usageErr();
-                }
-
-                i += 1;
-
-                if (i == argc) {
-                    usageErr();
-                }
-
-                replay_log_path = argv[i];
-            } else if (!strcmp("load-ckpt", arg)) {
-                if (load_ckpt_path != nullptr) {
-                    usageErr();
-                }
-
-                i += 1;
-
-                if (i == argc) {
-                    usageErr();
-                }
-
-                load_ckpt_path = argv[i];
-            } else if (!strcmp("freeze", arg)) {
-                start_frozen = true;
-            } else if (!strcmp("print-obs", arg)) {
-                print_obs = true;
-            } else {
-                usageErr();
-            }
-        } else {
-            if (num_worlds_set) {
-                usageErr();
-            }
-
-            num_worlds_set = true;
-
-            num_worlds = (uint32_t)atoi(arg);
-        }
-    }
+    uint32_t num_worlds = args.numWorlds;
+    ExecMode exec_mode = ExecMode::CUDA;
 
     uint32_t num_hiders = 3;
-    uint32_t num_seekers = 2;
+    uint32_t num_seekers = 3;
     uint32_t num_views = num_hiders + num_seekers;
 
-    auto *num_agents_str = getenv("HIDESEEK_NUM_AGENTS");
-
-    if (num_agents_str) {
-        uint32_t num_agents = std::stoi(num_agents_str);
-
-        num_hiders = (num_agents-2);
-
-        num_seekers = 2;
-
-        num_views = num_seekers + num_hiders;
-    }
-
-    auto replay_log = Optional<HeapArray<int32_t>>::none();
-    uint32_t cur_replay_step = 0;
-    uint32_t num_replay_steps = 0;
-    if (replay_log_path != nullptr) {
-        replay_log = readReplayLog(replay_log_path);
-        num_replay_steps = replay_log->size() / (num_worlds * num_views * 5);
-    }
-
     SimFlags sim_flags = SimFlags::Default;
+    sim_flags |= SimFlags::IgnoreEpisodeLength;
 
-    if (replay_log_path == nullptr) {
-        sim_flags |= SimFlags::IgnoreEpisodeLength;
-    }
+    bool enable_batch_renderer = (args.renderMode == run::RenderMode::Rasterizer);
 
-    auto *render_mode = getenv("MADRONA_RENDER_MODE");
-    
-    bool enable_batch_renderer =
-#ifdef MADRONA_MACOS
-        false;
-#else
-        render_mode[0] == '1';
-#endif
-
-    // auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
-    // uint32_t raycast_output_resolution = std::stoi(resolution_str);
-    uint32_t raycast_output_resolution = 128;
+    uint32_t output_resolution = args.batchRenderWidth;
 
     WindowManager wm {};
     WindowHandle window = wm.makeWindow("Hide & Seek", 2730/2, 1536/2);
@@ -194,11 +78,11 @@ int main(int argc, char *argv[])
         .minSeekers = num_seekers,
         .maxSeekers = num_seekers,
         .enableBatchRenderer = enable_batch_renderer,
-        .batchRenderViewWidth = raycast_output_resolution,
-        .batchRenderViewHeight = raycast_output_resolution,
+        .batchRenderViewWidth = output_resolution,
+        .batchRenderViewHeight = output_resolution,
         .extRenderAPI = wm.gpuAPIManager().backend(),
         .extRenderDev = render_gpu.device(),
-        .raycastOutputResolution = raycast_output_resolution
+        .raycastOutputResolution = output_resolution
     });
     mgr.init();
 
@@ -208,70 +92,11 @@ int main(int argc, char *argv[])
 
     viz::Viewer viewer(mgr.getRenderManager(), window.get(), {
         .numWorlds = num_worlds,
-        .simTickRate = start_frozen ? 0_u32 : 25_u32,
+        .simTickRate = 25_u32,
         .cameraMoveSpeed = 10.f,
         .cameraPosition = { 0.f, 0.f, 40 },
         .cameraRotation = initial_camera_rotation,
     });
-
-    auto replayStep = [&]() {
-        if (cur_replay_step == num_replay_steps - 1) {
-            return true;
-        }
-
-        printf("Step: %u\n", cur_replay_step);
-
-        for (uint32_t i = 0; i < num_worlds; i++) {
-            for (uint32_t j = 0; j < num_views; j++) {
-                uint32_t base_idx = 0;
-                base_idx = 5 * (cur_replay_step * num_views * num_worlds +
-                    i * num_views + j);
-
-                int32_t move_amount = (*replay_log)[base_idx];
-                int32_t move_angle = (*replay_log)[base_idx + 1];
-                int32_t turn = (*replay_log)[base_idx + 2];
-                int32_t g = (*replay_log)[base_idx + 3];
-                int32_t l = (*replay_log)[base_idx + 4];
-
-                printf("%d, %d: %d %d %d %d %d\n",
-                       i, j, move_amount, move_angle, turn, g, l);
-                mgr.setAction(i * num_views + j, move_amount, move_angle, turn, g, l);
-            }
-        }
-
-        cur_replay_step++;
-
-        return false;
-    };
-
-    auto global_pos_printer = mgr.globalPositionsTensor().makePrinter();
-    auto prep_count_printer = mgr.prepCounterTensor().makePrinter();
-    auto vis_agents_printer = mgr.agentDataTensor().makePrinter();
-    auto vis_agents_mask_printer = mgr.visibleAgentsMaskTensor().makePrinter();
-    auto lidar_printer = mgr.lidarTensor().makePrinter();
-    auto reward_printer = mgr.rewardTensor().makePrinter();
-
-    auto printObs = [&]() {
-        if (!print_obs) {
-            return;
-        }
-
-        printf("Global Position\n");
-        global_pos_printer.print();
-        printf("Prep Counter\n");
-        prep_count_printer.print();
-        printf("Agents\n");
-        vis_agents_printer.print();
-        printf("Visible Agents Mask\n");
-        vis_agents_mask_printer.print();
-        printf("Lidar\n");
-        lidar_printer.print();
-        printf("Reward\n");
-        reward_printer.print();
-        
-
-        printf("\n");
-    };
 
     viewer.loop(
     [&](CountT world_idx,
@@ -361,21 +186,11 @@ int main(int argc, char *argv[])
 
         mgr.setAction(world_idx * num_views + agent_idx, x, y, r, g, l);
     }, [&]() {
-        if (replay_log.has_value()) {
-            bool replay_finished = replayStep();
-
-            if (replay_finished) {
-                viewer.stopLoop();
-            }
-        }
-
         mgr.step();
-
-        printObs();
     }, [&]() {
         unsigned char* print_ptr;
         #ifdef MADRONA_CUDA_SUPPORT
-            int64_t num_bytes = 4 * raycast_output_resolution * raycast_output_resolution;
+            int64_t num_bytes = 4 * output_resolution * output_resolution;
             print_ptr = (unsigned char*)cu::allocReadback(num_bytes);
         #else
             print_ptr = nullptr;
@@ -383,7 +198,7 @@ int main(int argc, char *argv[])
 
         char *raycast_tensor = (char *)(mgr.raycastTensor().devicePtr());
 
-        uint32_t bytes_per_image = 4 * raycast_output_resolution * raycast_output_resolution;
+        uint32_t bytes_per_image = 4 * output_resolution * output_resolution;
         uint32_t image_idx = viewer.getCurrentWorldID() * GPUHideSeek::consts::maxAgents + 
             std::max(viewer.getCurrentViewID(), (CountT)0);
         raycast_tensor += image_idx * bytes_per_image;
@@ -406,12 +221,12 @@ int main(int argc, char *argv[])
         int vertOff = 70;
 
         float pixScale = 3;
-        int extentsX = (int)(pixScale * raycast_output_resolution);
-        int extentsY = (int)(pixScale * raycast_output_resolution);
+        int extentsX = (int)(pixScale * output_resolution);
+        int extentsY = (int)(pixScale * output_resolution);
 
-        for (int i = 0; i < raycast_output_resolution; i++) {
-            for (int j = 0; j < raycast_output_resolution; j++) {
-                uint32_t linear_idx = 4 * (j + i * raycast_output_resolution);
+        for (int i = 0; i < output_resolution; i++) {
+            for (int j = 0; j < output_resolution; j++) {
+                uint32_t linear_idx = 4 * (j + i * output_resolution);
 
                 auto realColor = IM_COL32(
                         (uint8_t)raycasters[linear_idx + 0],

@@ -49,6 +49,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     registry.registerComponent<AgentCamera>();
     registry.registerArchetype<Agent>();
     registry.registerArchetype<DummyRenderable>();
+    registry.registerSingleton<TimeSingleton>();
 
     registry.exportColumn<Agent, Action>(
         (uint32_t)ExportID::Action);
@@ -57,7 +58,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::Raycast);
 }
 
-// #define DYNAMIC_MOVEMENT
+#define DYNAMIC_MOVEMENT
 
 inline void movementSystem(Engine &ctx,
                            Entity e,
@@ -108,18 +109,19 @@ inline void movementSystem(Engine &ctx,
 
 
 #if defined(DYNAMIC_MOVEMENT)
+    float current_time = ctx.singleton<TimeSingleton>().currentTime;
     float entity_offset = (float)e.id;
     pos = Vector3{ 
         20.f * std::cosf(random_thing + 
-                         ctx.data().currentTime +
+                         current_time +
                          entity_offset), 
 
         20.f * std::sinf(random_thing + 
-                         ctx.data().currentTime +
+                         current_time +
                          entity_offset),
 
         15.f + std::sinf(random_thing + 
-                         ctx.data().currentTime +
+                         current_time +
                          entity_offset) * 3.0f
     };
 
@@ -128,6 +130,12 @@ inline void movementSystem(Engine &ctx,
 #endif
 
     rot = eulerToQuat(cam.yaw, cam.pitch);
+}
+
+inline void timeUpdateSys(Engine &ctx,
+                          TimeSingleton &time_single)
+{
+    time_single.currentTime += 0.05f;
 }
 
 #ifdef MADRONA_GPU_MODE
@@ -158,7 +166,12 @@ static void setupStepTasks(TaskGraphBuilder &builder,
             AgentCamera
         >>({});
 
-    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({move_sys});
+    auto time_sys = builder.addToGraph<ParallelForNode<Engine,
+         timeUpdateSys,
+            TimeSingleton
+        >>({move_sys});
+
+    auto clear_tmp = builder.addToGraph<ResetTmpAllocNode>({time_sys});
     (void)clear_tmp;
 
 #ifdef MADRONA_GPU_MODE
@@ -255,6 +268,8 @@ Sim::Sim(Engine &ctx,
     RenderingSystem::init(ctx, cfg.renderBridge);
 
     loadInstances(ctx);
+
+    ctx.singleton<TimeSingleton>().currentTime = 0.f;
 }
 
 // This declaration is needed for the GPU backend in order to generate the

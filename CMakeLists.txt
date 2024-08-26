@@ -9,6 +9,7 @@ include(setup)
 include(dependencies)
 
 add_subdirectory(external)
+add_subdirectory(common)
 add_subdirectory(habitat)
 add_subdirectory(hideseek)
 add_subdirectory(mjx)

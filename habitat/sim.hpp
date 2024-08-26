@@ -46,6 +46,10 @@ struct UniqueScene {
     madrona::math::Vector3 center;
 };
 
+struct TimeSingleton {
+    float currentTime;
+};
+
 // The Sim class encapsulates the per-world state of the simulation.
 // Sim is always available by calling ctx.data() given a reference
 // to the Engine / Context object that is passed to each ECS system.
