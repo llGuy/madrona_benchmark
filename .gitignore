@@ -1,5 +1,4 @@
 build
-data/hssd-hab
 data/ai2thor-hab
 mjxenv
 mjx/madrona_mjx/__pycache__
