@@ -31,7 +31,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
         (uint32_t)ExportID::CameraRotations);
 
     registry.exportColumn<
-        render::RaycastOutputArchetype, render::RenderOutputBuffer>(
+        render::RaycastOutputArchetype, render::DepthOutputBuffer>(
                 (uint32_t)ExportID::Raycast);
 }
 

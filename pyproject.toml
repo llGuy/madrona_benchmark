@@ -1,0 +1,13 @@
+[build-system]
+requires = []
+build-backend = "madrona-py-build"
+backend-path = ["external/madrona/py"]
+
+[project]
+name = "madrona_mjx"
+version = "0.0.1"
+
+[tool.madrona.packages.madrona_mjx]
+path = "mjx/madrona_mjx"
+ext-out-dir = "build"
+extensions = [ "_madrona_mjx_batch_renderer", "_madrona_mjx_visualizer" ]
