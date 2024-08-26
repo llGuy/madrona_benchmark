@@ -82,9 +82,6 @@ if (TARGET madrona_viz)
         -DMADRONA_VIEWER
     )
 
-    # target_compile_options(habitat_viewer PRIVATE -fsanitize=address)
-    # target_link_options(habitat_viewer PRIVATE -fsanitize=address)
-
     if (TARGET madrona_cuda)
         target_link_libraries(habitat_viewer PRIVATE madrona_cuda)
     endif()
