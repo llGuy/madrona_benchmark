@@ -49,7 +49,6 @@ int main(int argc, char *argv[])
 
     constexpr int64_t num_views = 2;
 
-    printf("Started in: \n");
     // Read command line arguments
     uint32_t num_worlds = 1;
     if (argc >= 2) {
@@ -94,11 +93,8 @@ int main(int argc, char *argv[])
 
     WindowManager wm {};
     WindowHandle window = wm.makeWindow("Escape Room", 1080, 720);
-    printf("Here\n");
     render::GPUHandle render_gpu = wm.initGPU(0, { window.get() });
 
-
-    printf("premanage: \n");
 
     // auto *resolution_str = getenv("MADRONA_RENDER_RESOLUTION");
     // uint32_t raycast_output_resolution = std::stoi(resolution_str);
@@ -119,8 +115,6 @@ int main(int argc, char *argv[])
         .extRenderDev = render_gpu.device(),
         .raycastOutputResolution = raycast_output_resolution,
     });
-    printf("postmanage: \n");
-
     float camera_move_speed = 10.f;
 
     math::Vector3 initial_camera_position = { 0, consts::worldLength / 2.f, 30 };
@@ -145,8 +139,6 @@ int main(int argc, char *argv[])
             return true;
         }
 
-        printf("Step: %u\n", cur_replay_step);
-
         for (uint32_t i = 0; i < num_worlds; i++) {
             for (uint32_t j = 0; j < num_views; j++) {
                 uint32_t base_idx = 0;
@@ -158,8 +150,6 @@ int main(int argc, char *argv[])
                 int32_t turn = (*replay_log)[base_idx + 2];
                 int32_t g = (*replay_log)[base_idx + 3];
 
-                printf("%d, %d: %d %d %d %d\n",
-                       i, j, move_amount, move_angle, turn, g);
                 mgr.setAction(i, j, move_amount, move_angle, turn, g,
                         1, 1, 1, 1, 1);
             }

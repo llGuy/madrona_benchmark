@@ -256,7 +256,6 @@ static imp::ImportedAssets loadScenes(
 
     const char *seed_str = getenv("MADRONA_SEED");
     if (seed_str) {
-        printf("Using seed!\n");
         rng.seed(std::stoi(seed_str));
     } else {
         rng.seed(0);
@@ -269,7 +268,7 @@ static imp::ImportedAssets loadScenes(
 
     for (int i = first_unique_scene; i < num_unique_scenes; ++i) {
         int random_index = random_indices[i];
-        printf("################ Loading scene with index %d #######################\n", random_index);
+        printf("Loading scene with %d\n", random_index);
 
         std::string scene_path = scene_paths[random_index];
 
@@ -390,16 +389,10 @@ static imp::ImportedAssets loadScenes(
 
         unique_scene_info.center = unique_scene_info.center / (float)num_center_contribs;
 
-        printf("%f %f %f\n", unique_scene_info.center.x, unique_scene_info.center.y, unique_scene_info.center.z);
-
         load_result.uniqueSceneInfos.push_back(unique_scene_info);
-
-        printf("Loaded %d render objects\n", (int)loaded_gltfs.size());
 
         num_loaded_scenes++;
     }
-
-    printf("$$$$$$$$$$$$$$$$$$$$$$$ Loaded %d scenes\n $$$$$$$$$$$$$$$$$$$$$\n", num_loaded_scenes);
 
     std::vector<const char *> render_asset_cstrs;
     for (size_t i = 0; i < render_asset_paths.size(); i++) {
@@ -426,8 +419,6 @@ static imp::ImportedAssets loadScenes(
     }
 
     if (render_mgr.has_value()) {
-        printf("Rasterizer is loading assets\n");
-
         render_mgr->loadObjects(render_assets->objects, 
                 render_assets->materials,
                 render_assets->textures);
@@ -536,7 +527,6 @@ Manager::Impl * Manager::Impl::init(
         }
 
 
-        printf("Combine compile:\n");
         MWCudaExecutor gpu_exec({
             .worldInitPtr = world_inits.data(),
             .numWorldInitBytes = sizeof(Sim::WorldInit),
@@ -578,12 +568,8 @@ Manager::Impl * Manager::Impl::init(
             }
         } ();
 
-        printf("Combine postcompile\n");
-
         Action *agent_actions_buffer = 
             (Action *)gpu_exec.getExported((uint32_t)ExportID::Action);
-
-        fprintf(stderr,"About to exit\n");
 
         return new CUDAImpl {
             mgr_cfg,
