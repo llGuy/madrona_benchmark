@@ -13,7 +13,7 @@ namespace madMJX {
 // Refer to the nanobind documentation for more details on these functions.
 NB_MODULE(_madrona_mjx_batch_renderer, m) {
     // Each simulator has a madrona submodule that includes base types
-    // like madrona::py::Tensor
+    // like madrona::py::Tensor and madrona::py::PyExecMode.
     madrona::py::setupMadronaSubmodule(m);
 
     nb::class_<VisualizerGPUHandles>(m, "VisualizerGPUHandles");
@@ -21,6 +21,7 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
     nb::class_<Manager>(m, "MadronaBatchRenderer")
         .def("__init__", [](
             Manager *self,
+            madrona::py::PyExecMode exec_mode,
             int64_t gpu_id,
             nb::ndarray<const float, nb::shape<-1, 3>,
                 nb::device::cpu> mesh_vertices,
@@ -34,14 +35,12 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
                 nb::device::cpu> geom_types,
             nb::ndarray<const int32_t, nb::shape<-1>,
                 nb::device::cpu> geom_data_ids,
-            nb::ndarray<const float, nb::shape<-1, 3>,
+            nb::ndarray<const int32_t, nb::shape<-1, 3>,
                 nb::device::cpu> geom_sizes,
             int64_t num_cams,
             int64_t num_worlds,
             int64_t batch_render_view_width,
             int64_t batch_render_view_height,
-            // bool add_cam_debug_geo,
-            // bool use_rt,
             VisualizerGPUHandles *viz_gpu_hdls)
         {
             MJXModelGeometry mesh_geo {
@@ -63,16 +62,20 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
                 .numCams = (uint32_t)num_cams,
             };
 
+            const char *render_mode = getenv("MADRONA_RENDER_MODE");
+            assert(render_mode);
+
             new (self) Manager(Manager::Config {
+                .execMode = exec_mode,
                 .gpuID = (int)gpu_id,
                 .numWorlds = (uint32_t)num_worlds,
                 .batchRenderViewWidth = (uint32_t)batch_render_view_width,
                 .batchRenderViewHeight = (uint32_t)batch_render_view_height,
-                .addCamDebugGeometry = false,
-                .useRT = true,
+                .useRaycaster = render_mode[0] == '2'
             }, mjx_model, viz_gpu_hdls != nullptr ? *viz_gpu_hdls :
                 Optional<VisualizerGPUHandles>::none());
-        }, nb::arg("gpu_id"),
+        }, nb::arg("exec_mode"),
+           nb::arg("gpu_id"),
            nb::arg("mesh_vertices"),
            nb::arg("mesh_faces"),
            nb::arg("mesh_vertex_offsets"),
@@ -85,7 +88,7 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
            nb::arg("batch_render_view_width"),
            nb::arg("batch_render_view_height"),
            nb::arg("visualizer_gpu_handles") = nb::none(),
-           nb::keep_alive<1, 16>())
+           nb::keep_alive<1, 15>())
         .def("init", [](Manager &mgr,
                         nb::ndarray<const float, nb::shape<-1, -1, 3>> geom_pos,
                         nb::ndarray<const float, nb::shape<-1, -1, 4>> geom_rot,
@@ -116,6 +119,8 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
         .def("camera_rotations_tensor", &Manager::cameraRotationsTensor)
         .def("rgb_tensor", &Manager::rgbTensor)
         .def("depth_tensor", &Manager::depthTensor)
+        .def("raycast_rgb_tensor", &Manager::raycastRGBTensor)
+        .def("raycast_depth_tensor", &Manager::raycastDepthTensor)
         .def("xla_entries", [](Manager &mgr)
         {
             Manager *mgr_ptr = &mgr;

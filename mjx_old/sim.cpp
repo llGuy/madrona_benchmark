@@ -18,35 +18,30 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
     RenderingSystem::registerTypes(registry, cfg.renderBridge);
 
     registry.registerArchetype<RenderEntity>();
+    registry.registerArchetype<CameraEntity>();
 
     registry.exportColumn<RenderEntity, Position>(
         (uint32_t)ExportID::InstancePositions);
     registry.exportColumn<RenderEntity, Rotation>(
         (uint32_t)ExportID::InstanceRotations);
 
-    
-    registry.registerArchetype<CameraEntity>();
-
     registry.exportColumn<CameraEntity, Position>(
-            (uint32_t)ExportID::CameraPositions);
+        (uint32_t)ExportID::CameraPositions);
     registry.exportColumn<CameraEntity, Rotation>(
-            (uint32_t)ExportID::CameraRotations);
+        (uint32_t)ExportID::CameraRotations);
 
-    if (cfg.useRT) {
-        registry.exportColumn<render::RaycastOutputArchetype, 
-            render::DepthOutputBuffer>((uint32_t)ExportID::RaycastDepth);
-        registry.exportColumn<render::RaycastOutputArchetype, 
-            render::RGBOutputBuffer>((uint32_t)ExportID::RaycastColor);
-    }
+    registry.exportColumn<
+        render::RaycastOutputArchetype, render::RGBOutputBuffer>(
+                (uint32_t)ExportID::RaycastColor);
+
+    registry.exportColumn<
+        render::RaycastOutputArchetype, render::DepthOutputBuffer>(
+                (uint32_t)ExportID::RaycastDepth);
 }
 
 static void setupRenderTasks(TaskGraphBuilder &builder,
                              Span<const TaskGraphNodeID> deps)
 {
-#if 0
-    builder.addToGraph<ParallelForNode<
-        Engine, printTransforms, Position, Rotation, Scale, ObjectID>>(deps);
-#endif
     RenderingSystem::setupTasks(builder, deps);
 }
 
@@ -64,26 +59,23 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 }
 #endif
 
-static void setupInitTasks(TaskGraphBuilder &builder,
-                           const Sim::Config &cfg)
+static void setupInitTasks(TaskGraphBuilder &builder)
 {
 #ifdef MADRONA_GPU_MODE
-    TaskGraphNodeID sort_sys;
-
-    sort_sys = queueSortByWorld<CameraEntity>(builder, {});
-
+    auto sort_sys = queueSortByWorld<CameraEntity>(builder, {});
     sort_sys = queueSortByWorld<RenderEntity>(builder, {sort_sys});
+
+    setupRenderTasks(builder, {sort_sys});
 #else
-    (void)builder;
-    (void)cfg;
+    setupRenderTasks(builder, {});
 #endif
 }
 
 // Build the task graph
-void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
+void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &)
 {
     TaskGraphBuilder &init_builder = taskgraph_mgr.init(TaskGraphID::Init);
-    setupInitTasks(init_builder, cfg);
+    setupInitTasks(init_builder);
 
     TaskGraphBuilder &render_tasks_builder =
         taskgraph_mgr.init(TaskGraphID::Render);
@@ -111,42 +103,19 @@ Sim::Sim(Engine &ctx,
             scale.d0 = plane_scale;
             scale.d1 = plane_scale;
             scale.d2 = plane_scale;
-            scale = { 0, 0, 0 }; // Hack
-            render_obj_idx = (int32_t)RenderPrimObjectIDs::Plane;
+            render_obj_idx = 0;
         } break;
         case MJXGeomType::Sphere: {
             float sphere_scale = cfg.geomSizes[geom_idx].x;
             scale.d0 = sphere_scale;
             scale.d1 = sphere_scale;
             scale.d2 = sphere_scale;
-            scale = { 0, 0, 0 }; // Hack
-            render_obj_idx = (int32_t)RenderPrimObjectIDs::Sphere;
-        } break;
-        case MJXGeomType::Capsule: {
-            Vector3 geom_size = cfg.geomSizes[geom_idx];
-            scale.d0 = geom_size.x;
-            scale.d1 = geom_size.y;
-            scale.d2 = geom_size.z;
-            scale = { 0, 0, 0 }; // Hack
-            render_obj_idx = (int32_t)RenderPrimObjectIDs::Sphere;
-        } break;
-        case MJXGeomType::Box: {
-            Vector3 geom_size = cfg.geomSizes[geom_idx];
-            scale.d0 = geom_size.x;
-            scale.d1 = geom_size.y;
-            scale.d2 = geom_size.z;
-            render_obj_idx = (int32_t)RenderPrimObjectIDs::Box;
+            render_obj_idx = 1;
         } break;
         case MJXGeomType::Mesh: {
             scale = Diag3x3 { 1, 1, 1 };
-            render_obj_idx = (int32_t)RenderPrimObjectIDs::NumPrims +
-                cfg.geomDataIDs[geom_idx];
+            render_obj_idx = 2 + cfg.geomDataIDs[geom_idx];
         } break;
-        case MJXGeomType::Heightfield:
-        case MJXGeomType::Ellipsoid:
-        case MJXGeomType::Cylinder:
-            assert(false);
-            break;
         default: {
             assert(false);
         } break;
@@ -156,8 +125,7 @@ Sim::Sim(Engine &ctx,
     }
 
     for (CountT cam_idx = 0; cam_idx < (CountT)cfg.numCams; cam_idx++) {
-        Entity cam;
-        cam = ctx.makeEntity<CameraEntity>();
+        Entity cam = ctx.makeEntity<CameraEntity>();
         ctx.get<Position>(cam) = Vector3::zero();
         ctx.get<Rotation>(cam) = Quat { 1, 0, 0, 0 };
         render::RenderingSystem::attachEntityToView(

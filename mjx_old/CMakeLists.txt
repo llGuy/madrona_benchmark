@@ -1,9 +1,9 @@
-set(SIMULATOR_SRCS
+set(MJX_SIMULATOR_SRCS
     types.hpp sim.hpp sim.inl sim.cpp
 )
 
 add_library(madmjx_cpu_impl STATIC
-    ${SIMULATOR_SRCS}
+    ${MJX_SIMULATOR_SRCS}
 )
 
 target_link_libraries(madmjx_cpu_impl
@@ -28,7 +28,6 @@ target_link_libraries(madmjx_mgr
         madrona_importer
         madrona_physics_loader
         madrona_render
-        madrona_render_asset_processor
 )
 
 if (TARGET madrona_mw_gpu)
@@ -40,13 +39,14 @@ if (TARGET madrona_mw_gpu)
         FLAGS_DEFN
             GPU_HIDESEEK_COMPILE_FLAGS 
         SRCS
-            ${SIMULATOR_SRCS}
+            ${MJX_SIMULATOR_SRCS}
     )
 
     target_link_libraries(madmjx_mgr PRIVATE
         madmjx_gpu_srcs
         madrona_mw_gpu
         madrona_cuda
+        run_common
     )
 endif ()
 

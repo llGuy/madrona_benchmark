@@ -50,6 +50,7 @@ class BatchRenderer(flax.struct.PyTreeNode):
     num_cams = m.ncam
 
     madrona = MadronaBatchRenderer(
+        exec_mode = ExecMode.CPU if cpu_madrona else ExecMode.CUDA,
         gpu_id = gpu_id,
         mesh_vertices = mesh_verts,
         mesh_faces = mesh_faces,
