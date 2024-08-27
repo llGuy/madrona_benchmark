@@ -84,7 +84,7 @@ struct Visualizer {
                 print_ptr = nullptr;
 #endif
 
-            char *raycast_tensor = (char *)(mgr.raycastTensor().devicePtr());
+            char *raycast_tensor = (char *)(mgr.raycastRGBTensor().devicePtr());
 
             uint32_t bytes_per_image = 3 * raycast_output_resolution * raycast_output_resolution;
             uint32_t image_idx = viewer.getCurrentWorldID() * mgr.numCams() + 

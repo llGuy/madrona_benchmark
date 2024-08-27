@@ -119,6 +119,8 @@ NB_MODULE(_madrona_mjx_batch_renderer, m) {
         .def("camera_rotations_tensor", &Manager::cameraRotationsTensor)
         .def("rgb_tensor", &Manager::rgbTensor)
         .def("depth_tensor", &Manager::depthTensor)
+        .def("raycast_rgb_tensor", &Manager::raycastRGBTensor)
+        .def("raycast_depth_tensor", &Manager::raycastDepthTensor)
         .def("xla_entries", [](Manager &mgr)
         {
             Manager *mgr_ptr = &mgr;

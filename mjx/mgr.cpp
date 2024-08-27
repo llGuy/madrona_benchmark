@@ -795,16 +795,29 @@ Tensor Manager::depthTensor() const
     }, impl_->cfg.gpuID);
 }
 
-Tensor Manager::raycastTensor() const
+Tensor Manager::raycastRGBTensor() const
 {
     uint32_t pixels_per_view = impl_->raycastOutputResolution *
         impl_->raycastOutputResolution;
 
-    return impl_->exportTensor(ExportID::Raycast,
+    return impl_->exportTensor(ExportID::RaycastColor,
                                TensorElementType::UInt8,
                                {
                                    impl_->cfg.numWorlds * impl_->numCams,
-                                   pixels_per_view * 3
+                                   pixels_per_view * 4
+                               });
+}
+
+Tensor Manager::raycastDepthTensor() const
+{
+    uint32_t pixels_per_view = impl_->raycastOutputResolution *
+        impl_->raycastOutputResolution;
+
+    return impl_->exportTensor(ExportID::RaycastDepth,
+                               TensorElementType::Float32,
+                               {
+                                   impl_->cfg.numWorlds * impl_->numCams,
+                                   pixels_per_view
                                });
 }
 

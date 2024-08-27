@@ -87,7 +87,8 @@ public:
     MGR_EXPORT madrona::py::Tensor rgbTensor() const;
     MGR_EXPORT madrona::py::Tensor depthTensor() const;
 
-    MGR_EXPORT madrona::py::Tensor raycastTensor() const;
+    MGR_EXPORT madrona::py::Tensor raycastRGBTensor() const;
+    MGR_EXPORT madrona::py::Tensor raycastDepthTensor() const;
 
     MGR_EXPORT uint32_t numWorlds() const;
     MGR_EXPORT madrona::render::RenderManager & getRenderManager();
