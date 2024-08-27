@@ -17,6 +17,8 @@
 #include <fstream>
 #include <string>
 
+#include "dump.hpp"
+
 #ifdef MADRONA_CUDA_SUPPORT
 #include <madrona/mw_gpu.hpp>
 #include <madrona/cuda_utils.hpp>
@@ -231,6 +233,7 @@ struct Manager::CPUImpl final : Manager::Impl {
 struct Manager::CUDAImpl final : Manager::Impl {
     MWCudaExecutor gpuExec;
     MWCudaLaunchGraph renderGraph;
+    Optional<MWCudaLaunchGraph> rtGraph;
 
     inline CUDAImpl(const Manager::Config &mgr_cfg,
                     uint32_t num_geoms,
@@ -241,7 +244,9 @@ struct Manager::CUDAImpl final : Manager::Impl {
         : Impl(mgr_cfg, num_geoms, num_cams,
                std::move(render_gpu_state), std::move(render_mgr)),
           gpuExec(std::move(gpu_exec)),
-          renderGraph(gpuExec.buildLaunchGraph(TaskGraphID::Render))
+          renderGraph(gpuExec.buildLaunchGraph(TaskGraphID::Render)),
+          rtGraph(mgr_cfg.useRaycaster ? gpuExec.buildRenderGraph()
+                  : Optional<MWCudaLaunchGraph>::none())
     {}
 
     inline virtual ~CUDAImpl() final {}
@@ -286,6 +291,11 @@ struct Manager::CUDAImpl final : Manager::Impl {
         copyInTransforms(geom_positions, geom_rotations,
                          cam_positions, cam_rotations, 0);
         gpuExec.run(init_graph);
+
+        if (rtGraph.has_value()) {
+            gpuExec.run(*rtGraph);
+        }
+
         renderCommon();
     }
 
@@ -298,6 +308,11 @@ struct Manager::CUDAImpl final : Manager::Impl {
                          cam_positions, cam_rotations, 0);
 
         gpuExec.run(renderGraph);
+
+        if (rtGraph.has_value()) {
+            gpuExec.run(*rtGraph);
+        }
+
         renderCommon();
     }
 
@@ -362,9 +377,15 @@ struct Manager::CUDAImpl final : Manager::Impl {
                          jax_io.camPositions, jax_io.camRotations, strm);
 
         gpuExec.runAsync(init_graph, strm);
+
+        if (rtGraph.has_value()) {
+            gpuExec.runAsync(*rtGraph, strm);
+        }
+
         // Currently a CPU sync is needed to read back the total number of
         // instances for Vulkan
         REQ_CUDA(cudaStreamSynchronize(strm));
+
         renderCommon();
 
         copyOutRendered(jax_io.rgbOut, jax_io.depthOut, strm);
@@ -377,29 +398,30 @@ struct Manager::CUDAImpl final : Manager::Impl {
         copyInTransforms(jax_io.geomPositions, jax_io.geomRotations,
                          jax_io.camPositions, jax_io.camRotations, strm);
 
-#if 0
-        Vector3 *readback_pos = (Vector3 *)malloc(sizeof(Vector3) * numGeoms * cfg.numWorlds);
-        cudaMemcpy(jax_io.geomPositions,
-                   readback_pos,
-                   sizeof(Vector3) * numGeoms * cfg.numWorlds,
-                   cudaMemcpyHostToDevice);
-        printf("%f %f %f\n",
-            readback_pos[1].x,
-            readback_pos[1].y,
-            readback_pos[1].z);
-#endif
-
         gpuExec.runAsync(renderGraph, strm);
+
+        if (rtGraph.has_value()) {
+            gpuExec.runAsync(*rtGraph, strm);
+        }
+
         // Currently a CPU sync is needed to read back the total number of
         // instances for Vulkan
         REQ_CUDA(cudaStreamSynchronize(strm));
 
-#if 0
-        if (useRaycaster) {
-            printf("Calling getTimings()\n");
-            gpuExec.getTimings(renderGraph);
-        }
-#endif
+        uint32_t pixels_per_view = raycastOutputResolution *
+            raycastOutputResolution;
+
+        void *ptr = exportTensor(ExportID::RaycastColor,
+                TensorElementType::UInt8,
+                {
+                    cfg.numWorlds * numCams,
+                    pixels_per_view * 4
+                }).devicePtr();
+
+        run::dumpTiledImage({ "out", ptr, 
+                cfg.numWorlds * numCams,
+                raycastOutputResolution,
+                run::ColorType::RGB });
 
         renderCommon();
 

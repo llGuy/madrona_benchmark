@@ -46,6 +46,7 @@ if (TARGET madrona_mw_gpu)
         madmjx_gpu_srcs
         madrona_mw_gpu
         madrona_cuda
+        run_common
     )
 endif ()
 
