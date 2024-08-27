@@ -9,7 +9,7 @@ namespace run {
 ViewerRunArgs parseViewerArgs(int argc, char **argv)
 {
     auto usage_err = [argv]() {
-        fprintf(stderr, "%s [NUM_WORLDS] [rt|rast] [WINDOW_WIDTH] [WINDOW_HEIGHT] [BATCH_WIDTH] [BATCH_HEIGHT]\n", argv[0]);
+        fprintf(stderr, "%s [NUM_WORLDS] [rt|rast] [WINDOW_WIDTH] [WINDOW_HEIGHT] [BATCH_WIDTH] [BATCH_HEIGHT] [extra...]\n", argv[0]);
         exit(EXIT_FAILURE);
     };
 
@@ -19,8 +19,11 @@ ViewerRunArgs parseViewerArgs(int argc, char **argv)
         usage_err();
     }
 
+    run_args.argCounter = 0;
     for (int i = 1; i < argc; ++i) {
         char *arg = argv[i];
+
+        ++run_args.argCounter;
 
         if (i == 1) {
             run_args.numWorlds = std::stoi(arg);
@@ -60,8 +63,10 @@ HeadlessRunArgs parseHeadlessArgs(int argc, char **argv)
         usage_err();
     }
 
+    run_args.argCounter = 0;
     for (int i = 1; i < argc; ++i) {
         char *arg = argv[i];
+        ++run_args.argCounter;
 
         if (i == 1) {
             run_args.numWorlds = std::stoi(arg);

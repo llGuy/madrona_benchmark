@@ -20,6 +20,8 @@ struct ViewerRunArgs {
 
     uint32_t batchRenderWidth;
     uint32_t batchRenderHeight;
+
+    uint32_t argCounter;
 };
 
 struct HeadlessRunArgs {
@@ -34,6 +36,8 @@ struct HeadlessRunArgs {
     // Dumps the output for the final frame.
     bool dumpOutputFile;
     std::string outputFileName;
+
+    uint32_t argCounter;
 };
 
 ViewerRunArgs parseViewerArgs(int argc, char **argv);
