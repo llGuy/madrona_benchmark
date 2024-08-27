@@ -212,21 +212,33 @@ static imp::ImportedAssets loadGLB(
         LoadResult &load_result)
 {
     std::vector<std::string> render_asset_paths;
+
+    // Object 0 is the glb object
     render_asset_paths.push_back(
             std::filesystem::path(DATA_DIR) / glb_path);
 
+    // Object 1 is the plane
+    render_asset_paths.push_back(
+            std::filesystem::path(DATA_DIR) / "plane.obj");
+
     printf("GLB path to render: %s\n", render_asset_paths[0].c_str());
 
-    ImportedInstance new_inst = {
+    load_result.importedInstances.push_back({
         .position = { 0.f, 0.f, 0.f },
         .rotation = Quat::angleAxis(pi_d2, { 1.f, 0.f, 0.f }),
         .scale = Diag3x3{ 10.f, 10.f, 10.f },
         .objectID = 0
-    };
+    });
 
-    load_result.importedInstances.push_back(new_inst);
+    load_result.importedInstances.push_back({
+        .position = { 0.f, 0.f, 0.f },
+        .rotation = Quat::angleAxis(pi_d2, { 0.f, 0.f, 1.f }),
+        .scale = Diag3x3{ 0.01f, 0.01f, 0.01f },
+        .objectID = 1
+    });
+
     load_result.uniqueSceneInfos.push_back({
-        1, 0, 1, { 0.f, 0.f, 0.f }
+        2, 0, 2, { 0.f, 0.f, 0.f }
     });
 
     std::vector<const char *> render_asset_cstrs;
@@ -247,6 +259,16 @@ static imp::ImportedAssets loadGLB(
     if (!render_assets.has_value()) {
         FATAL("Failed to load render assets: %s", import_err);
     }
+
+    render_assets->materials.push_back({
+        .color = { 1.f, 1.f, 1.f, 1.f },
+        .textureIdx = -1,
+        .roughness = 1.f,
+        .metalness = 0.1f,
+    });
+
+    render_assets->objects[1].meshes[0].materialIDX = 
+        render_assets->materials.size() - 1;
 
     if (render_mgr.has_value()) {
         render_mgr->loadObjects(render_assets->objects, 
