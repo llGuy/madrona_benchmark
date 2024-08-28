@@ -90,10 +90,10 @@ inline void movementSystem(Engine &ctx,
     float random_thing =  
         ctx.data().rng.sampleUniform() * range - range / 2.f;
 
-#if defined(DYNAMIC_MOVEMENT)
-    cam.yaw += 0.15f;
-    cam.pitch = -0.33f;
-#endif
+    if (ctx.data().dynamicMovement) {
+        cam.yaw += 0.15f;
+        cam.pitch = -0.33f;
+    }
 
     cam.yaw += (action.rot - 1) * consts::sensitivity;
     cam.yaw -= math::pi_m2 * 
@@ -108,26 +108,26 @@ inline void movementSystem(Engine &ctx,
     pos += new_velocity;
 
 
-#if defined(DYNAMIC_MOVEMENT)
-    float current_time = ctx.singleton<TimeSingleton>().currentTime;
-    float entity_offset = (float)e.id;
-    pos = Vector3{ 
-        20.f * std::cosf(random_thing + 
-                         current_time +
-                         entity_offset), 
+    if (ctx.data().dynamicMovement) {
+        float current_time = ctx.singleton<TimeSingleton>().currentTime;
+        float entity_offset = (float)e.id;
+        pos = Vector3{ 
+            20.f * std::cosf(random_thing + 
+                             current_time +
+                             entity_offset), 
 
-        20.f * std::sinf(random_thing + 
-                         current_time +
-                         entity_offset),
+            20.f * std::sinf(random_thing + 
+                             current_time +
+                             entity_offset),
 
-        15.f + std::sinf(random_thing + 
-                         current_time +
-                         entity_offset) * 3.0f
-    };
+            15.f + std::sinf(random_thing + 
+                             current_time +
+                             entity_offset) * 3.0f
+        };
 
-    pos.x += ctx.data().worldCenter.x;
-    pos.y += ctx.data().worldCenter.y;
-#endif
+        pos.x += ctx.data().worldCenter.x;
+        pos.y += ctx.data().worldCenter.y;
+    }
 
     rot = eulerToQuat(cam.yaw, cam.pitch);
 }
@@ -270,6 +270,8 @@ Sim::Sim(Engine &ctx,
     loadInstances(ctx);
 
     ctx.singleton<TimeSingleton>().currentTime = 0.f;
+
+    dynamicMovement = cfg.dynamicMovement;
 }
 
 // This declaration is needed for the GPU backend in order to generate the

@@ -460,6 +460,7 @@ Manager::Impl * Manager::Impl::init(
         std::vector<ImportedInstance> imported_instances;
 
         sim_cfg.mergeAll = false;
+        sim_cfg.dynamicMovement = mgr_cfg.dynamicMovement;
 
         const char *first_unique_scene_str = getenv("HSSD_FIRST_SCENE");
         const char *num_unique_scene_str = getenv("HSSD_NUM_SCENES");
