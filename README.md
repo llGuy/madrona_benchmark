@@ -17,7 +17,7 @@ pip install -e .
 
 
 Problems (order of priority):
-- Hideseek is missing some walls
+- Fix MJX
 
 From build/ directory to run (Hideseek and Habitat):
 ```
