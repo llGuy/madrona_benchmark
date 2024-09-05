@@ -221,8 +221,6 @@ static imp::ImportedAssets loadScenes(
         "ai2thor-hab/ai2thor-hab/configs/scenes/ProcTHOR/5";
     std::string procthor_root = std::filesystem::path(DATA_DIR) /
         "ai2thor-hab/ai2thor-hab/configs";
-
-    //Use Uncompressed because our GLTF loader doesn't support loading compressed vertex formats
     std::string procthor_obj_root = std::filesystem::path(DATA_DIR) /
         "ai2thor-hab/ai2thorhab-uncompressed/configs";
 
@@ -236,10 +234,6 @@ static imp::ImportedAssets loadScenes(
     for (const auto &dir_entry :
             std::filesystem::directory_iterator(hssd_scenes)) {
         scene_paths.push_back(dir_entry.path());
-    }
-
-    if (cache_everything && std::stoi(cache_everything) == 1) {
-        num_unique_scenes = scene_paths.size();
     }
 
     std::vector<std::string> render_asset_paths;
@@ -266,8 +260,16 @@ static imp::ImportedAssets loadScenes(
     // Get all the asset paths and push unique scene infos
     uint32_t num_loaded_scenes = 0;
 
+    uint32_t random_index_counter = 0;
     for (int i = first_unique_scene; i < num_unique_scenes; ++i) {
-        int random_index = random_indices[i];
+        int random_index = random_indices[random_index_counter];
+        random_index_counter++;
+
+        if (random_index == 37) {
+            --i;
+            continue;
+        }
+
         printf("Loading scene with %d\n", random_index);
 
         std::string scene_path = scene_paths[random_index];
@@ -438,7 +440,7 @@ Manager::Impl * Manager::Impl::init(
     sim_cfg.autoReset = mgr_cfg.autoReset;
     sim_cfg.initRandKey = rand::initKey(mgr_cfg.randSeed);
 
-    const char *num_agents_str = getenv("HIDESEEK_NUM_AGENTS");
+    const char *num_agents_str = getenv("MADRONA_NUM_AGENTS");
     if (num_agents_str) {
         uint32_t num_agents = std::stoi(num_agents_str);
         sim_cfg.numAgents = num_agents;
@@ -604,7 +606,7 @@ Manager::Manager(const Config &cfg)
     //
     // This will be improved in the future with support for multiple task
     // graphs, allowing a small task graph to be executed after initialization.
-    const char *num_agents_str = getenv("HIDESEEK_NUM_AGENTS");
+    const char *num_agents_str = getenv("MADRONA_NUM_AGENTS");
     if (num_agents_str) {
         uint32_t num_agents = std::stoi(num_agents_str);
         numAgents = num_agents;

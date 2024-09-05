@@ -203,7 +203,7 @@ void Sim::setupTasks(TaskGraphManager &taskgraph_mgr, const Config &cfg)
     setupRenderTasks(taskgraph_mgr.init(TaskGraphID::Render), cfg);
 }
 
-static void loadInstances(Engine &ctx)
+static void loadInstances(Engine &ctx, uint32_t num_agents)
 {
     for (int i = 0; i < (int)ctx.data().numImportedInstances; ++i) {
         ImportedInstance *imp_inst = &ctx.data().importedInstances[i];
@@ -217,8 +217,8 @@ static void loadInstances(Engine &ctx)
         render::RenderingSystem::makeEntityRenderable(ctx, e_inst);
     }
 
-    { // Create the agent entity of this world
-        Entity agent = ctx.data().agent =
+    for (int i = 0; i < num_agents; ++i) {
+        Entity agent =
             ctx.makeEntity<Agent>();
 
         ctx.get<AgentCamera>(agent) = { 
@@ -263,11 +263,13 @@ Sim::Sim(Engine &ctx,
 
     numImportedInstances = unique_scene->numInstances;
 
+    numAgents = cfg.numAgents;
+
     worldCenter = { unique_scene->center.x, unique_scene->center.y };
 
     RenderingSystem::init(ctx, cfg.renderBridge);
 
-    loadInstances(ctx);
+    loadInstances(ctx, numAgents);
 
     ctx.singleton<TimeSingleton>().currentTime = 0.f;
 

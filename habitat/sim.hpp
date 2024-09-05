@@ -100,7 +100,7 @@ struct Sim : public madrona::WorldBase {
 
     madrona::math::Vector2 worldCenter;
 
-    madrona::Entity agent;
+    uint32_t numAgents;
 
     bool dynamicMovement;
 };

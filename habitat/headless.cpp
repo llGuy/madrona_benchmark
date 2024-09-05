@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
             .gpuTensor = (void *)mgr.raycastTensor().devicePtr(),
             .numImages = (uint32_t)num_worlds,
             .imageResolution = output_resolution
-        });
+        }, 1, 8);
     }
 
     auto end = std::chrono::system_clock::now();
