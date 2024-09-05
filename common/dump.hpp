@@ -24,5 +24,8 @@ struct DumpInfo {
 };
 
 void dumpTiledImage(const DumpInfo &info);
+void dumpTiledImage(const DumpInfo &info,
+                    uint32_t teaser_width,
+                    uint32_t teaser_height);
 
 }
