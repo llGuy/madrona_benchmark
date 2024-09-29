@@ -62,12 +62,21 @@ int main(int argc, char *argv[])
     }
 
     if (args.dumpOutputFile) {
+        run::dumpImages({
+            .outputPath = args.outputFileName,
+            .gpuTensor = (void *)mgr.raycastTensor().devicePtr(),
+            .numImages = (uint32_t)num_worlds,
+            .imageResolution = output_resolution
+        }, "images", args.outputFileName.c_str());
+
+#if 0
         run::dumpTiledImage({
             .outputPath = args.outputFileName,
             .gpuTensor = (void *)mgr.raycastTensor().devicePtr(),
             .numImages = (uint32_t)num_worlds,
             .imageResolution = output_resolution
         }, 1, 8);
+#endif
     }
 
     auto end = std::chrono::system_clock::now();

@@ -193,4 +193,54 @@ void dumpTiledImage(const DumpInfo &info,
     free(tmp_image_memory);
 }
 
+void dumpImages(const DumpInfo &info,
+                const char *dir_out_cstr,
+                const char *name_base_cstr)
+{
+    using namespace madrona;
+
+    std::string dir_out = std::string(dir_out_cstr);
+
+    uint32_t num_images_total = info.numImages;
+    uint32_t output_resolution = info.imageResolution;
+
+    unsigned char* print_ptr;
+    int64_t num_bytes = 4 * output_resolution * output_resolution * num_images_total;
+    print_ptr = (unsigned char*)cu::allocReadback(num_bytes);
+
+    char *raycast_tensor = (char *)info.gpuTensor;
+
+    // 4 is the size of each pixel regardless of RGB or depth
+    uint32_t bytes_per_image = 4 * output_resolution * output_resolution;
+    uint32_t row_stride_bytes = 4 * output_resolution;
+
+    uint32_t image_idx = 0;
+
+    uint32_t base_image_idx = num_images_total * (image_idx / num_images_total);
+
+    raycast_tensor += image_idx * bytes_per_image;
+
+    cudaMemcpy(print_ptr, raycast_tensor,
+            num_bytes,
+            cudaMemcpyDeviceToHost);
+    raycast_tensor = (char *)print_ptr;
+
+    char *tmp_image_memory = (char *)calloc(bytes_per_image, 1);
+
+    for (int i = 0; i < num_images_total; ++i) {
+        std::string out_file_name = dir_out + 
+                                    "/" + std::string(name_base_cstr) +
+                                    std::to_string(i) +
+                                    ".png";
+
+        const char *input_image = raycast_tensor + i * bytes_per_image;
+        transposeImage(tmp_image_memory, input_image, output_resolution);
+
+        stbi_write_png(out_file_name.c_str(), output_resolution, output_resolution,
+                4, tmp_image_memory, 4 * output_resolution);
+    }
+
+    free(tmp_image_memory);
+}
+
 }

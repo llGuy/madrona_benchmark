@@ -61,7 +61,7 @@ void Sim::registerTypes(ECSRegistry &registry, const Config &cfg)
 // #define DYNAMIC_MOVEMENT
 
 inline void movementSystem(Engine &ctx,
-                           Entity e,
+                           Entity,
                            Action &action, 
                            Rotation &rot,
                            Position &pos,
@@ -89,6 +89,7 @@ inline void movementSystem(Engine &ctx,
     float range = 5.0f;
     float random_thing =  
         ctx.data().rng.sampleUniform() * range - range / 2.f;
+    (void)random_thing;
 
 #if defined(DYNAMIC_MOVEMENT)
     cam.yaw += 0.15f;
@@ -132,7 +133,7 @@ inline void movementSystem(Engine &ctx,
     rot = eulerToQuat(cam.yaw, cam.pitch);
 }
 
-inline void timeUpdateSys(Engine &ctx,
+inline void timeUpdateSys(Engine &,
                           TimeSingleton &time_single)
 {
     time_single.currentTime += 0.05f;
@@ -154,7 +155,7 @@ TaskGraph::NodeID queueSortByWorld(TaskGraph::Builder &builder,
 #endif
 
 static void setupStepTasks(TaskGraphBuilder &builder, 
-                           const Sim::Config &cfg)
+                           const Sim::Config &)
 {
     // Turn policy actions into movement
     auto move_sys = builder.addToGraph<ParallelForNode<Engine,
@@ -191,7 +192,7 @@ static void setupStepTasks(TaskGraphBuilder &builder,
 }
 
 static void setupRenderTasks(TaskGraphBuilder &builder, 
-                             const Sim::Config &cfg)
+                             const Sim::Config &)
 {
     RenderingSystem::setupTasks(builder, {});
 }

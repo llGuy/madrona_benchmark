@@ -260,15 +260,8 @@ static imp::ImportedAssets loadScenes(
     // Get all the asset paths and push unique scene infos
     uint32_t num_loaded_scenes = 0;
 
-    uint32_t random_index_counter = 0;
-    for (int i = first_unique_scene; i < num_unique_scenes; ++i) {
-        int random_index = random_indices[random_index_counter];
-        random_index_counter++;
-
-        if (random_index == 37) {
-            --i;
-            continue;
-        }
+    for (int i = first_unique_scene; i < first_unique_scene + num_unique_scenes; ++i) {
+        int random_index = random_indices[i];
 
         printf("Loading scene with %d\n", random_index);
 
