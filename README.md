@@ -59,6 +59,7 @@ Here we list out raw performance numbers on the GPUs we have tested for the Habi
 ### RTX 4090
 
 | *       | Ray Tracer | Rasterizer |
+|---------|------------|------------|
 | 64x64   | 60K FPS    | 15K FPS    |
 | 128x128 | 30K FPS    | 15K FPS    |
 | 256x256 | 13K FPS    | 15K FPS    |
@@ -66,6 +67,7 @@ Here we list out raw performance numbers on the GPUs we have tested for the Habi
 ### H100
 
 | *       | Ray Tracer | Rasterizer |
+|---------|------------|------------|
 | 64x64   | 60K FPS    | 400 FPS    |
 | 128x128 | 30K FPS    | 400 FPS    |
 | 256x256 | 13K FPS    | 400 FPS    |
