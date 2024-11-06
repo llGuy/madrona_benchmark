@@ -49,3 +49,23 @@ From scripts/ directory to run MJX:
 ```
 python headless.py [-h] [--gpu-id GPU_ID] --num-worlds NUM_WORLDS --num-steps NUM_STEPS --batch-render-view-width BATCH_RENDER_VIEW_WIDTH --batch-render-view-height BATCH_RENDER_VIEW_HEIGHT
 ```
+
+## Results
+
+Feel free to look at the paper for a more detailed analysis of the renderer's performance.
+Here we list out raw performance numbers on the GPUs we have tested for the Habitat environment
+(the most geometrically complex environment in the repository ~7M tri's per scene).
+
+### RTX 4090
+
+| *       | Ray Tracer | Rasterizer |
+| 64x64   | 60K FPS    | 15K FPS    |
+| 128x128 | 30K FPS    | 15K FPS    |
+| 256x256 | 13K FPS    | 15K FPS    |
+
+### H100
+
+| *       | Ray Tracer | Rasterizer |
+| 64x64   | 60K FPS    | 400 FPS    |
+| 128x128 | 30K FPS    | 400 FPS    |
+| 256x256 | 13K FPS    | 400 FPS    |
